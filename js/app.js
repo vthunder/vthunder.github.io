@@ -2,7 +2,7 @@ $(document).foundation();
 
 angular.module("app", [])
 
-  .value('appurl', "http://localhost:8000/")
+  .value('appurl', "http://vthunder.github.io/")
   .value('firebaseurl', "https://openhome.firebaseio.com/")
   .value('client_id', "798c72ca5049c8da83542ec260ecf9e9")
 
