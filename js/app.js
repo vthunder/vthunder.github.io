@@ -8,26 +8,49 @@ angular.module("app", [])
     };
   })
 
-  .factory('authService', 
-           ['dbService', '$rootScope',
-            function(dbService, $rootScope) {
-    var state = {};
+  .factory('authService',
+           ['dbService', '$rootScope', '$q',
+            function(dbService, $rootScope, $q) {
     return {
-      user: function() { return state.user; },
-      client: new FirebaseAuthClient(dbService.ref, function(error, user) {
-        if (user) {
-          state.user = user;
-          $rootScope.$emit("login", state.user);
-          $rootScope.$emit("loginEvent");
-        } else if (error) {
-          state.user = undefined;
-          $rootScope.$emit("loginError", error);
-          $rootScope.$emit("loginEvent");
-        } else {
-          state.user = undefined;
-          $rootScope.$emit("logout");
-          $rootScope.$emit("loginEvent");
+      user: function() {
+        return $rootScope.user;
+      },
+      login: function() {
+        if ($rootScope._deferred) {
+          $rootScope._deferred.reject();
         }
+        $rootScope._deferred = $q.defer();
+        this._client.login('persona');
+      },
+      logout: function() {
+        if ($rootScope._deferred) {
+          $rootScope._deferred.reject();
+        }
+        $rootScope._deferred = $q.defer();
+        this._client.logout();
+      },
+      _client: new FirebaseAuthClient(dbService.ref, function(error, user) {
+        $rootScope.$apply(function() {
+          if (error) {
+            $rootScope.user = null;
+            if ($rootScope._deferred) {
+              $rootScope._deferred.reject();
+              $rootScope._deferred = null;
+            }
+          } else if (user) {
+            $rootScope.user = user;
+            if ($rootScope._deferred) {
+              $rootScope._deferred.resolve(user);
+              $rootScope._deferred = null;
+            }
+          } else {
+            $rootScope.user = null;
+            if ($rootScope._deferred) {
+              $rootScope._deferred.resolve();
+              $rootScope._deferred = null;
+            }
+          }
+        });
       })
     };
   }])
@@ -38,13 +61,10 @@ angular.module("app", [])
     $scope.user = function() {
       return authService.user();
     };
-
     $scope.signin = function() {
-      authService.client.login('persona');
+      authService.login();
     };
     $scope.signout = function() {
-      authService.client.logout();
-    };
-    $scope.foo = function() {
+      authService.logout();
     };
   }]);
