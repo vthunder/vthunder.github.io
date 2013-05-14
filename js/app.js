@@ -2,53 +2,25 @@ $(document).foundation();
 
 angular.module("app", [])
 
-  .factory('dbService', function() {
-    return {
-      ref: new Firebase('https://openhome.firebaseio.com/')
-    };
+  .factory('dbRoot', function() {
+    return new Firebase('https://openhome.firebaseio.com/');
   })
 
-  .factory('authService',
-           ['dbService', '$rootScope', '$q',
-            function(dbService, $rootScope, $q) {
+  .factory('auth',
+           ['dbRoot', '$rootScope',
+            function(dbRoot, $rootScope) {
     return {
-      user: function() {
-        return $rootScope.user;
-      },
-      login: function() {
-        if ($rootScope._deferred) {
-          $rootScope._deferred.reject();
-        }
-        $rootScope._deferred = $q.defer();
-        this._client.login('persona');
-      },
-      logout: function() {
-        if ($rootScope._deferred) {
-          $rootScope._deferred.reject();
-        }
-        $rootScope._deferred = $q.defer();
-        this._client.logout();
-      },
-      _client: new FirebaseAuthClient(dbService.ref, function(error, user) {
+      client: new FirebaseAuthClient(dbRoot, function(error, user) {
         $rootScope.$apply(function() {
           if (error) {
+            $rootScope.userLoginError = error;
             $rootScope.user = null;
-            if ($rootScope._deferred) {
-              $rootScope._deferred.reject();
-              $rootScope._deferred = null;
-            }
           } else if (user) {
+            $rootScope.userLoginError = null;
             $rootScope.user = user;
-            if ($rootScope._deferred) {
-              $rootScope._deferred.resolve(user);
-              $rootScope._deferred = null;
-            }
           } else {
+            $rootScope.userLoginError = null;
             $rootScope.user = null;
-            if ($rootScope._deferred) {
-              $rootScope._deferred.resolve();
-              $rootScope._deferred = null;
-            }
           }
         });
       })
@@ -56,15 +28,16 @@ angular.module("app", [])
   }])
 
   .controller('UserCtrl',
-              ['$scope', 'authService',
-               function($scope, authService) {
+              ['$scope', '$rootScope', 'auth',
+               function($scope, $rootScope, auth) {
     $scope.user = function() {
-      return authService.user();
+      return $rootScope.user;
     };
     $scope.signin = function() {
-      authService.login();
+      auth.client.login('persona');
     };
     $scope.signout = function() {
-      authService.logout();
+      auth.client.logout();
+      $rootScope.user = null;
     };
   }]);
