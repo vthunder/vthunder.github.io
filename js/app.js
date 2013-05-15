@@ -82,7 +82,7 @@ angular.module("app", ['firebase'])
         var access_token = url.fparam('access_token') || url.fparam('/access_token');
         var account = url.fparam('account') || url.fparam('/account');
         if (access_token) {
-          connector.connectComplete(access_token, account);
+          this.connectComplete(access_token, account);
         }
       },
       connectComplete: function(access_token, account) {
