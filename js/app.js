@@ -1,25 +1,25 @@
 $(document).foundation();
 
+// find out host we're on
+// sadtimes: global
+var appurl = document.createElement('a');
+appurl.href = "/";
+appurl = appurl.href
+
 angular.module("app", [])
 
-  .value('appurl', "http://vthunder.github.io/")
+  .value('client_id', (appurl == "http://localhost:8000"?
+                       "798c72ca5049c8da83542ec260ecf9e9" : // dev sandbox
+                       "09d889f820287c976065fb270bdf987d")) // vthunder.github.io
   .value('firebaseurl', "https://openhome.firebaseio.com/")
-  .value('client_id', "798c72ca5049c8da83542ec260ecf9e9")
-
-  .config(['$locationProvider',
-        function($locationProvider) {
-//    $locationProvider
-//      .html5Mode(false)
-//      .hashPrefix('!');
-  }])
 
   .factory('dbRoot', ['firebaseurl', function(firebaseurl) {
     return new Firebase(firebaseurl);
   }])
 
   .factory('userSvc',
-           ['dbRoot', '$rootScope', '$http', '$window',
-            function(dbRoot, $rootScope, $http, $window) {
+           ['dbRoot', '$rootScope', '$http', '$window', 'client_id',
+            function(dbRoot, $rootScope, $http, $window, client_id) {
 
     $rootScope.user = {
       auth: {
@@ -45,7 +45,7 @@ angular.module("app", [])
           "?client_id=" + client_id +
           "&redirect_uri=" + redirect_uri +
           "&service=" + service +
-          access_token? ("&access_token=" + access_token) : "" +
+          (access_token? ("&access_token=" + access_token) : "") +
           "&response_type=token";
 
         $window.location.href = url;
@@ -77,8 +77,8 @@ angular.module("app", [])
   }])
 
   .controller('AppCtrl',
-              ['$scope', '$rootScope', '$window', 'userSvc', 'appurl', 'client_id',
-               function($scope, $rootScope, $window, userSvc, appurl, client_id) {
+              ['$scope', '$rootScope', 'userSvc',
+               function($scope, $rootScope, userSvc) {
 
     $scope.user = function() {
       return $rootScope.user;
