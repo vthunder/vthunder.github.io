@@ -6,7 +6,7 @@ var appurl = document.createElement('a');
 appurl.href = "/";
 appurl = appurl.href
 
-angular.module("app", [])
+angular.module("app", ['firebase'])
 
   .value('client_id', (appurl == "http://localhost:8000"?
                        "798c72ca5049c8da83542ec260ecf9e9" : // dev sandbox
@@ -17,29 +17,56 @@ angular.module("app", [])
     return new Firebase(firebaseurl);
   }])
 
-  .factory('userSvc',
-           ['dbRoot', '$rootScope', '$http', '$window', 'client_id',
-            function(dbRoot, $rootScope, $http, $window, client_id) {
+  .factory('authSvc',
+           ['$rootScope', 'dbRoot', 'angularFire', 'firebaseurl',
+            function($rootScope, dbRoot, angularFire, firebaseurl) {
 
-    $rootScope.user = {
-      auth: {
-        lastError: null,
-      },
-      data: {}
-    };
+    var auth = {};
 
     return {
+      authInfo: function() {
+        return auth;
+      },
+      signedIn: function() {
+        return auth.id? true : false;
+      },
       login: function() {
         this.client.login('persona');
       },
       logout: function() {
         this.client.logout();
-        $rootScope.user.auth.firebase = null;
+        auth.id = null;
+      },
+      client: new FirebaseAuthClient(dbRoot, function(error, user) {
+        if (error)
+          auth.lastError = error;
+        else if (user)
+          auth.id = user.id;
+        else
+          auth.id = null;
+        $rootScope.$broadcast('authStateChange');
+      })
+    };
+  }])
+
+  .factory('connector', 
+           ['$rootScope', '$location', '$http', '$window',
+            'authSvc', 'client_id', 'firebaseurl',
+            function($rootScope, $location, $http, $window,
+                     authSvc, client_id, firebaseurl) {
+    var accts = {};
+    var data = {};
+
+    return {
+      userAccts: function() {
+        return accts;
+      },
+      userData: function() {
+        return data;
       },
       connect: function(service) {
         var redirect_uri = encodeURIComponent(appurl);
-        var singly = $rootScope.user.auth.singly;
-        var access_token = singly? singly.access_token : "";
+        var access_token = accts.singly? accts.singly.access_token : "";
 
         var url = "https://api.singly.com/oauth/authenticate" +
           "?client_id=" + client_id +
@@ -50,54 +77,68 @@ angular.module("app", [])
 
         $window.location.href = url;
       },
-      singlyConnected: function(access_token, account) {
-        $rootScope.user.auth.singly = {
+      checkUrlParams: function() {
+        var url = purl($location.absUrl());
+        var access_token = url.fparam('access_token') || url.fparam('/access_token');
+        var account = url.fparam('account') || url.fparam('/account');
+        if (access_token) {
+          connector.connectComplete(access_token, account);
+        }
+      },
+      connectComplete: function(access_token, account) {
+        accts.singly = {
           access_token: access_token,
           account: account
-        }
+        };
+        $rootScope.$broadcast('connectComplete');
         $http.get("https://api.singly.com/profile?access_token=" + access_token)
-          .success(function(data) {
-            $rootScope.user.data.profile = data;
+          .success(function(profile) {
+            data.profile = profile;
+            $rootScope.$broadcast('profileUpdated');
           })
-          .error(function(data) {
-            alert("error: " + data);
+          .error(function(err) {
+            alert("error: " + err);
           });
       },
-      client: new FirebaseAuthClient(dbRoot, function(error, user) {
-        $rootScope.$apply(function() {
-          if (error)
-            $rootScope.user.auth.lastError = error;
-          else if (user)
-            $rootScope.user.auth.firebase = user;
-          else
-            $rootScope.user.auth.firebase = null;
-        });
-      })
     };
   }])
 
   .controller('AppCtrl',
-              ['$scope', '$rootScope', 'userSvc',
-               function($scope, $rootScope, userSvc) {
+              ['$scope', 'authSvc', 'connector',
+               function($scope, authSvc, connector) {
 
-    $scope.user = function() {
-      return $rootScope.user;
-    };
-    $scope.signedIn = function() {
-      return $rootScope.user.auth.firebase? true : false;
-    };
+    var apply = function() { $scope.$safeApply($scope); };
+    $scope.$on('authStateChange', apply);
+    $scope.$on('profileUpdated', apply);
 
-    $scope.signin = function() { userSvc.login(); };
-    $scope.signout = function() { userSvc.logout(); };
-    $scope.connect = function(service) { userSvc.connect(service); };
+    $scope.user = function() { return authSvc.userInfo(); };
+    $scope.userAccts = function() { return connector.userAccts(); };
+    $scope.userData = function() { return connector.userData(); };
+    $scope.signedIn = function() { return authSvc.signedIn(); };
+    $scope.signin = function() { authSvc.login(); };
+    $scope.signout = function() { authSvc.logout(); };
+    $scope.connect = function(service) { connector.connect(service); };
   }])
 
-  .run(['$location', '$http', 'userSvc',
-        function($location, $http, userSvc) {
-    var url = purl($location.absUrl());
-    var access_token = url.fparam('access_token') || url.fparam('/access_token');
-    var account = url.fparam('account') || url.fparam('/account');
-    if (access_token) {
-      userSvc.singlyConnected(access_token, account);
-    }
+  // init
+
+  .run(['$rootScope', 'connector',
+        function($rootScope, connector) {
+    //when you add it to the $rootScope variable, then it's accessible
+    //to all other $scope variables.
+    $rootScope.$safeApply = function($scope, fn) {
+      fn = fn || function() {};
+      if($scope.$$phase) {
+        //don't worry, the value gets set and AngularJS picks up on it...
+        fn();
+      }
+      else {
+        //this will fire to tell angularjs to notice that a change has happened
+        //if it is outside of it's own behaviour...
+        $scope.$apply(fn); 
+      }
+    };
+
+    // Check for OAuth return (token in URL params)
+    connector.checkUrlParams();
   }]);
