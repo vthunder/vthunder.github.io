@@ -26,15 +26,17 @@
 
 <body ng-controller="AppCtrl">
   <div class="row">
-    <div ng-show="!signedIn()">
+    <div ng-show="!auth.id">
       <h3>Welcome!</h3>
       <a href="" class="small button"
          ng-click="signin()">Sign in</a>
     </div>
-    <div ng-show="signedIn()">
-      <h3>Welcome, {{user.profile.name}}!</h3>
-      <a href="" class="small button"
-         ng-click="connect('facebook')">Connect to Facebook</a>
+    <div ng-show="auth.id">
+      <h3>Welcome, {{user.name}}!</h3>
+      <div ng-show="!user.services.facebook">
+        <a href="" class="small button"
+           ng-click="connect('facebook')">Connect to Facebook</a>
+      </div>
       <a href="" class="small button"
          ng-click="signout()">Sign out</a>
     </div>

@@ -79,15 +79,17 @@ angular.module("app", ['firebase'])
 
   .controller('AppCtrl', function($scope, authService, singly) {
 
+    $scope.auth = {};
     $scope.user = {
-      profile: {
-        name: "Anonymous"
-      }
+      name: "Anonymous"
     };
 
-    $scope.$on('authStateChange', function(event, user) {
-      $scope.user = user;
-      $scope.user.profile = {name: "Anonymous"};
+    $scope.$on('authStateChange', function(event, userAuth) {
+      $scope.auth = userAuth;
+      if (!$scope.auth.id)
+        $scope.user = {
+          name: "Anonymous"
+        };
       $scope.$safeApply($scope);
 
       // checks for OAuth token in url params - XXX should this go elsewhere?
@@ -96,12 +98,11 @@ angular.module("app", ['firebase'])
     $scope.$on('singlyConnected', function() {
       singly.getProfile()
         .success(function(profile) {
-          $scope.user.profile = profile;
+          $scope.user = profile;
           $scope.$safeApply($scope);
         });
     });
 
-    $scope.signedIn = function() { return $scope.user.id? true : false; };
     $scope.signin = function() { authService.login(); };
     $scope.signout = function() { authService.logout(); };
     $scope.connect = function(service) { singly.connect(service); };
